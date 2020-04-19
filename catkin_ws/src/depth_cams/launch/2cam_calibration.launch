@@ -1,0 +1,15 @@
+<launch>
+
+<node name="stereo_calibrator" pkg="camera_calibration" type="cameracalibrator.py" args="--size 8x6 --square 0.10 --no-service-check --approximate=0.1">
+    <remap from="right" to="/stereo/right/image_raw" />
+    <remap from="left" to="/stereo/left/image_raw" />
+    <!-- <remap from="right_camera" to="/stereo/right" /> -->
+    <!-- <remap from="left_camera" to="/stereo/left" /> -->
+</node>
+
+<!-- rosrun camera_calibration cameracalibrator.py
+--size 8x6 --square 0.108 right:=/stereo/right/image_raw
+left:=/stereo/left/image_raw right_camera:=/stereo/right
+left_camera:=/stereo/left  --no-service-check --approximate=0.1 -->
+
+</launch>

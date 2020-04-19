@@ -1,0 +1,7 @@
+<launch>
+
+<arg name="image_namespace" default="stereo" />
+
+<node ns="$(arg image_namespace)" name="video_2cam_pub" pkg="cam_depth" type="video_cap_2cam_node" output="screen" />
+
+</launch>

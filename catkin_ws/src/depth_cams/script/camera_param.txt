@@ -1,0 +1,5 @@
+here should be two values. Important: same measurement (mm, cm, m), but needless to indicate them
+distance to the object: 32.5
+chess cell width: 10
+matrix width: 5.784
+matrix height: 3.264
