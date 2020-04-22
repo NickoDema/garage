@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+from math import pi, sqrt, cos, sin, copysign, pow, atan2
+
 
 class Car():
     def __init__(self):
@@ -159,8 +161,8 @@ class Plotter():
     def __init__(self, xlim=[-12,12], ylim=[-12,12]):
         self.fig, self.ax = plt.subplots(1, 1, figsize=[10.0, 10.0], facecolor='w')
         self.ax.set_aspect('equal')
-        self.ax.set_xlim(xlim[0], xlim[1])
-        self.ax.set_ylim(ylim[0], ylim[1])
+        # self.ax.set_xlim(xlim[0], xlim[1])
+        # self.ax.set_ylim(ylim[0], ylim[1])
         self.ax.grid(True)
         self.ax.set_xlabel('X, [m]')
         self.ax.set_ylabel('Y, [m]')
@@ -400,17 +402,33 @@ class Plotter():
 
 class CarTrajectoryGenerator():
 
+    class Point():
+        def __init__(self):
+            self.t          = 0.0
+            self.l          = 0.0
+            self.x          = 0.0
+            self.y          = 0.0
+            self.z          = 0.0
+            self.v          = 0.0
+            self.a          = 0.0
+            self.yaw        = 0.0
+            self.dyaw       = 0.0
+            self.ddyaw      = 0.0
+            self.steering   = 0.0
+            self.dsteering  = 0.0
+            self.ddsteering = 0.0
+            self.curvature  = 0.0
+            self.dcurvature = 0.0
+            self.sharpness  = 0.0
+
+
     class Trajectory():
 
-        class Point():
-            def __init__(self):
-                self.t = []
-                self.x = []
-                self.y = []
-                self.yaw = []
-                self.steer = []
-                self.v = []
-                self.a = []
+        def __init__(self):
+            self.length = 0.0
+            self.time   = 0.0
+            self.points = []
+            self.points_num = 0
 
 
     class ClothoidGenerator():
@@ -436,11 +454,11 @@ class CarTrajectoryGenerator():
 
 
         def xCoordByS(self, gamma, alpha, s, step):
-            return gamma * sqrt(pi / abs(alpha)) * Cf_by_int(sqrt(abs(alpha) / pi) * s, step)
+            return gamma * sqrt(pi / abs(alpha)) * self.Cf_by_int(sqrt(abs(alpha) / pi) * s, step)
 
 
         def yCoordByS(self, gamma, alpha, s, step):
-            return gamma * copysign(1, alpha) * sqrt(pi / abs(alpha)) * Sf_by_int(sqrt(abs(alpha) / pi) * s, step)
+            return gamma * copysign(1, alpha) * sqrt(pi / abs(alpha)) * self.Sf_by_int(sqrt(abs(alpha) / pi) * s, step)
 
 
         def tCoordByS(self, gamma, alpha, s):
@@ -448,11 +466,11 @@ class CarTrajectoryGenerator():
 
 
         def xCoordByD(self, d_cc, k_cc, d, step):
-            return copysign(1, d_cc) * sqrt(2 * pi * abs(d_cc)) / k_cc * Cf_by_int(sqrt(2 * abs(d) / pi), step)
+            return copysign(1, d_cc) * sqrt(2 * pi * abs(d_cc)) / k_cc * self.Cf_by_int(sqrt(2 * abs(d) / pi), step)
 
 
         def yCoordByD(self, d_cc, k_cc, d, step):
-            return sqrt(2 * pi * abs(d_cc)) / k_cc * Sf_by_int(sqrt(2 * abs(d) / pi), step)
+            return sqrt(2 * pi * abs(d_cc)) / k_cc * self.Sf_by_int(sqrt(2 * abs(d) / pi), step)
 
 
         def tCoordByD(self, d):
@@ -473,7 +491,7 @@ class CarTrajectoryGenerator():
 
                 new_yaw = cur_yaw + to_yaw
 
-            return np.array([new_xy[0] + to_x, new_xy[1] + to_y, new_yaw]).T
+            return new_xy[0] + to_x, new_xy[1] + to_y, new_yaw
 
 
         # [new_x, new_y] = ( R(from_yaw)^(T) * [cur_x, cur_y]^(T) - R(from_yaw)^(T) * [from_x, from_y]^(T) )^(T)
@@ -486,7 +504,7 @@ class CarTrajectoryGenerator():
 
             new_yaw = cur_yaw - from_yaw
 
-            return np.array([new_xy[0], new_xy[1], new_yaw]).T
+            return new_xy[0], new_xy[1], new_yaw
 
 
         def calcClothoidPointsByS(self, gamma, alpha, s_end, type, step):
@@ -566,7 +584,7 @@ class CarTrajectoryGenerator():
             k_cc = 1.0 / turn_radius_cc
             alpha = (k_cc ** 2) / (2 * d_cc)
             s_end = abs(k_cc / alpha)
-            gamma = copysign(1, k_cc)*copysign(1,d_cc)
+            gamma = copysign(1, k_cc) * copysign(1, d_cc)
 
             if type == "out":
                 alpha *= -1
@@ -575,30 +593,209 @@ class CarTrajectoryGenerator():
             return self.calcClothoidPointsByS(gamma, alpha, s_end, type, step)
 
 
-    def build_8_traj_using_4_clothoids(min_turn_radius=1.0, v_max = 1.0, a_max=1.0, frequency=100.0):
+        def calc_x_y_yaw_by_length(self, gamma, alpha, length, full_length, type, step):
+            if (type == "in"):
+                x, y, yaw = self.xCoordByS(gamma, alpha, length, step), \
+                            self.yCoordByS(gamma, alpha, length, step), \
+                            self.tCoordByS(gamma, alpha, length)
+            else:
 
+                origin_x, origin_y, origin_yaw = self.xCoordByS(-gamma, alpha, full_length, step), \
+                                                 self.yCoordByS(-gamma, alpha, full_length, step), \
+                                                 self.tCoordByS( gamma, alpha, full_length)
+
+                x, y, yaw = self.xCoordByS(-gamma, alpha, full_length - length, step), \
+                            self.yCoordByS(-gamma, alpha, full_length - length, step), \
+                            self.tCoordByS( gamma, alpha, full_length - length)
+                x, y, yaw = self.itransform(x, y, yaw, origin_x, origin_y, origin_yaw)
+
+            return x, y, yaw
+
+
+        def calc_x_y_yaw_by_curv_on_length(self, max_clothoid_angle, min_turn_radius, length, type, step):
+            max_curvature = 1.0 / min_turn_radius
+            sharpness = (max_curvature ** 2) / (2 * max_clothoid_angle)
+            clothoid_length = abs(max_curvature / sharpness)
+            gamma = copysign(1, max_curvature) * copysign(1, max_clothoid_angle)
+
+            if type == "out":
+                sharpness *= -1
+
+
+            return self.calc_x_y_yaw_by_length(gamma, sharpness, length, clothoid_length, type, step)
+
+
+    def get_8_traj_sectors_params(self, clothoid_generator, max_clothoid_angle, min_turn_radius, clothoid_length, calc_accuracy):
+
+        trajectory_sectors = {0:{'angle':     max_clothoid_angle,
+                                 'radius':    min_turn_radius,
+                                 'type':      "in",
+                                 'length':    clothoid_length,
+                                 'end_pose':  {'x':0.,'y':0.,'yaw':0.}},
+                              1:{'angle':     max_clothoid_angle,
+                                 'radius':    min_turn_radius,
+                                 'type':      "out",
+                                 'length':    clothoid_length,
+                                 'end_pose':  {'x':0.,'y':0.,'yaw':0.}},
+                              2:{'angle':    -max_clothoid_angle,
+                                 'radius':   -min_turn_radius,
+                                 'type':      "in",
+                                 'length':    clothoid_length,
+                                 'end_pose':  {'x':0.,'y':0.,'yaw':0.}},
+                              3:{'angle':    -max_clothoid_angle,
+                                 'radius':   -min_turn_radius,
+                                 'type':      "out",
+                                 'length':    clothoid_length,
+                                 'end_pose':  {'x':0.,'y':0.,'yaw':0.}}}
+
+        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[0]['angle'],
+                                                                      trajectory_sectors[0]['radius'],
+                                                                      trajectory_sectors[0]['length'],
+                                                                      trajectory_sectors[0]['type'],
+                                                                      calc_accuracy)
+
+        trajectory_sectors[0]['end_pose']['x'] = x
+        trajectory_sectors[0]['end_pose']['y'] = y
+        trajectory_sectors[0]['end_pose']['yaw'] = yaw
+
+        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[1]['angle'],
+                                                                      trajectory_sectors[1]['radius'],
+                                                                      trajectory_sectors[1]['length'],
+                                                                      trajectory_sectors[1]['type'],
+                                                                      calc_accuracy)
+
+        x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[0]['end_pose']['x'],
+                                                            trajectory_sectors[0]['end_pose']['y'],
+                                                            trajectory_sectors[0]['end_pose']['yaw'])
+
+        trajectory_sectors[1]['end_pose']['x'] = x
+        trajectory_sectors[1]['end_pose']['y'] = y
+        trajectory_sectors[1]['end_pose']['yaw'] = yaw
+
+        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[2]['angle'],
+                                                                      trajectory_sectors[2]['radius'],
+                                                                      trajectory_sectors[2]['length'],
+                                                                      trajectory_sectors[2]['type'],
+                                                                      calc_accuracy)
+
+        x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[1]['end_pose']['x'],
+                                                            trajectory_sectors[1]['end_pose']['y'],
+                                                            trajectory_sectors[1]['end_pose']['yaw'])
+
+        trajectory_sectors[2]['end_pose']['x'] = x
+        trajectory_sectors[2]['end_pose']['y'] = y
+        trajectory_sectors[2]['end_pose']['yaw'] = yaw
+
+        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[3]['angle'],
+                                                                      trajectory_sectors[3]['radius'],
+                                                                      trajectory_sectors[3]['length'],
+                                                                      trajectory_sectors[3]['type'],
+                                                                      calc_accuracy)
+
+        x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[2]['end_pose']['x'],
+                                                            trajectory_sectors[2]['end_pose']['y'],
+                                                            trajectory_sectors[2]['end_pose']['yaw'])
+
+        trajectory_sectors[3]['end_pose']['x'] = x
+        trajectory_sectors[3]['end_pose']['y'] = y
+        trajectory_sectors[3]['end_pose']['yaw'] = yaw
+
+        return trajectory_sectors
+
+
+    def generate_8_traj_using_4_clothoids(self, min_turn_radius, max_vel = 1.0, acc=1.0, dec=1.5, frequency=100.0):
+
+        period = 1.0 / frequency
         max_clothoid_angle = 2.27884
-        curvature_max = 1.0 / min_turn_radius                       # dtheta_max
-        sharpness = (curvature_max ** 2) / (2 * max_clothoid_angle) # ddtheta
-        clothoid_length = abs(curvature_max / sharpness)
+        max_curvature = 1.0 / min_turn_radius                           # dtheta_max / ds
+        sharpness = (max_curvature ** 2) / (2 * max_clothoid_angle)     # ddtheta / ds
+        clothoid_length = abs(max_curvature / sharpness)
+        calc_accuracy = 0.01
 
         clothoid_generator = self.ClothoidGenerator()
 
-        # points1 = calcClothoidPointsByDwithS(d_cc=2.27884, turn_radius_cc=turns_for_8, type="in",  step=0.01) #green
-        # for i in range(0, len(points1)):
-        #     points1[i] = transform(points1[i,0], points1[i,1], points1[i,2], 0.0, 0.0, -(2.27884-m.pi/2))
-        #
-        # points2 = calcClothoidPointsByDwithS(d_cc=2.27884, turn_radius_cc=turns_for_8, type="out",  step=0.01) #red
-        # for i in range(0, len(points2)):
-        #     points2[i] = transform(points2[i,0], points2[i,1], points2[i,2], points1[-1,0], points1[-1,1], points1[-1,2],)
-        #
-        # points3 = calcClothoidPointsByDwithS(d_cc=-2.27884, turn_radius_cc=-turns_for_8, type="in",  step=0.01) #blue
-        # for i in range(0, len(points3)):
-        #     points3[i] = transform(points3[i,0], points3[i,1], points3[i,2], points2[-1,0], points2[-1,1], points2[-1,2])
-        #
-        # points4 = calcClothoidPointsByDwithS(d_cc=-2.27884, turn_radius_cc=-turns_for_8, type="out",  step=0.01) #yellow
-        # for i in range(0, len(points4)):
-        #     points4[i] = transform(points4[i,0], points4[i,1], points4[i,2], points3[-1,0], points3[-1,1], points3[-1,2],)
+        trajectory_sectors = self.get_8_traj_sectors_params(clothoid_generator,
+                                                            max_clothoid_angle,
+                                                            min_turn_radius,
+                                                            clothoid_length,
+                                                            calc_accuracy)
+
+        trajectory_length = clothoid_length * 4.0
+
+        dec = float(copysign(dec, -1))
+        acc = float(copysign(acc,  1))
+
+        possible_max_vel = sqrt(2 * trajectory_length * acc * abs(dec) / (acc + abs(dec)))
+        max_vel = min (max_vel, possible_max_vel)
+
+        time_to_get_max_vel       = abs(max_vel / acc)
+        time_to_stop_from_max_vel = abs(max_vel / dec)
+
+        acc_path_length       = acc * (time_to_get_max_vel ** 2) / 2.0
+        dec_path_length       = abs(dec) * (time_to_stop_from_max_vel ** 2 / 2.0)
+        const_vel_path_length = trajectory_length - (acc_path_length + dec_path_length)
+
+        trajectory_time = time_to_get_max_vel + time_to_stop_from_max_vel
+        if (const_vel_path_length > max_vel * 2.0 * period):
+            trajectory_time += const_vel_path_length / max_vel
+
+        trajectory_points_num = int(trajectory_time * frequency) + 1
+
+        trajectory = self.Trajectory()
+        trajectory.points_num = trajectory_points_num
+        trajectory.length     = trajectory_length
+        trajectory.time       = trajectory_time
+
+        # print("full l\t" + str(trajectory.length))
+        # print("acc  l\t" + str(acc_path_length))
+        # print("cons l\t" + str(const_vel_path_length))
+        # print("dec  l\t" + str(dec_path_length))
+        # print("full t\t" + str(trajectory_time))
+        # print("acc  t\t" + str(time_to_get_max_vel))
+        # print("dec  t\t" + str(time_to_stop_from_max_vel))
+
+        for i in range(trajectory.points_num):
+            trajectory_point = self.Point()
+            trajectory_point.t = i * period
+
+            if (trajectory_point.t <= time_to_get_max_vel):
+                trajectory_point.a = acc
+                trajectory_point.v = trajectory_point.a * trajectory_point.t
+                trajectory_point.l = trajectory_point.a * trajectory_point.t ** 2 / 2.0
+
+            elif (trajectory_point.t > time_to_get_max_vel and
+                  trajectory_point.t < (trajectory_time - time_to_stop_from_max_vel)):
+                const_vel_time = trajectory_point.t - time_to_get_max_vel
+                trajectory_point.a = 0.0
+                trajectory_point.v = max_vel
+                trajectory_point.l = acc_path_length + max_vel * const_vel_time
+
+            else:
+                dec_time = (trajectory_point.t - (trajectory_time - time_to_stop_from_max_vel))
+                trajectory_point.a = dec
+                trajectory_point.v = max_vel + dec * dec_time
+                trajectory_point.l = trajectory_length - dec_path_length + \
+                                     max_vel * dec_time + trajectory_point.a * dec_time ** 2 / 2.0
+
+            trajectory.points.append(trajectory_point)
+
+        for point in trajectory.points:
+            sector = int(point.l / clothoid_length)
+            print(str(point.l)+"\t"+str(trajectory.length)+"\t"+str(sector))
+            x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[sector]['angle'],
+                                                                          trajectory_sectors[sector]['radius'],
+                                                                          point.l - sector * clothoid_length,
+                                                                          trajectory_sectors[sector]['type'],
+                                                                          calc_accuracy)
+
+            if (sector > 0):
+                x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[sector-1]['end_pose']['x'],
+                                                                    trajectory_sectors[sector-1]['end_pose']['y'],
+                                                                    trajectory_sectors[sector-1]['end_pose']['yaw'])
+
+            point.x, point.y, point.yaw = x, y, yaw
+
+        return trajectory
 
 
 def update_plot(frame, car, plotter, traj_plot=None):
@@ -645,7 +842,7 @@ def main():
     # with plt.xkcd():
 
     car = Car()
-    car.generate_8_traj_by_control(dt=0.02)
+    # car.generate_8_traj_by_control(dt=0.02)
 
     plotter = Plotter([-13,13], [-13,13])
 
@@ -655,18 +852,39 @@ def main():
     #       str(round(alpha, 2)) + "\t" + \
     #       str(round(s_end, 2)))
 
-    animation_dt = 0.05
-    animation_period = 1000./(1./animation_dt)
-    traj_plot = plotter.draw_traj_from_history(car, dt=animation_dt, frames=True,
-                                                                     frames_dt=0.4,
-                                                                     footprints=True,
-                                                                     footprints_dt=0.4)
+    # animation_dt = 0.05
+    # animation_period = 1000./(1./animation_dt)
+    # traj_plot = plotter.draw_traj_from_history(car, dt=animation_dt, frames=True,
+    #                                                                  frames_dt=0.4,
+    #                                                                  footprints=True,
+    #                                                                  footprints_dt=0.4)
 
-    animation = FuncAnimation(plotter.fig,
-                              update_plot,
-                              fargs=(car, plotter, traj_plot),
-                              interval=40,          # if too large and blit is True
-                              blit=True)            # throw an exeption but works somehow
+    # animation = FuncAnimation(plotter.fig,
+    #                           update_plot,
+    #                           fargs=(car, plotter, traj_plot),
+    #                           interval=40,          # if too large and blit is True
+    #                           blit=True)            # throw an exeption but works somehow
+
+    trajectoryGen = CarTrajectoryGenerator()
+    trajectory = trajectoryGen.generate_8_traj_using_4_clothoids(min_turn_radius=2, max_vel = 2.0, acc=0.2, dec=0.4, frequency=10.0)
+    t=[]
+    l=[]
+    v=[]
+    a=[]
+    x=[]
+    y=[]
+    for point in trajectory.points:
+        x.append(point.x)
+        y.append(point.y)
+        t.append(point.t)
+        l.append(point.l)
+        v.append(point.v)
+        a.append(point.a)
+
+    plotter.ax.plot(x, y, lw=3, color="#A000A0")
+    plotter.ax.plot(t, l, lw=3, color="#A00000")
+    plotter.ax.plot(t, v, lw=3, color="#00B000")
+    plotter.ax.plot(t, a, lw=3, color="#000090")
 
     plt.show()
 
