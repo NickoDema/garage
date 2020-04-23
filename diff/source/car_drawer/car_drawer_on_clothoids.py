@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+from datetime import datetime
+
 from math import pi, sqrt, cos, sin, copysign, pow, atan2
 
 
@@ -93,10 +95,13 @@ class Car():
             turn_radius = m.copysign(self.min_radius, turn_radius)
             # warn!
 
-        steering = np.arctan2(self.wheelbase, turn_radius)
+        if (abs(turn_radius) > 10 ** 4):
+            steering = 0.0
+        else:
+            steering = np.arctan2(self.wheelbase, turn_radius)
 
-        if (turn_radius < 0):
-            steering -= np.pi
+            if (turn_radius < 0):
+                steering -= np.pi
 
         return steering
 
@@ -159,8 +164,8 @@ class Car():
 class Plotter():
 
     def __init__(self, xlim=[-12,12], ylim=[-12,12]):
-        self.fig, self.ax = plt.subplots(1, 1, figsize=[10.0, 10.0], facecolor='w')
-        self.ax.set_aspect('equal')
+        self.fig, self.ax = plt.subplots(1, 1, figsize=[10.0, 12.0], facecolor='w')
+        # self.ax.set_aspect('equal')
         # self.ax.set_xlim(xlim[0], xlim[1])
         # self.ax.set_ylim(ylim[0], ylim[1])
         self.ax.grid(True)
@@ -255,6 +260,184 @@ class Plotter():
                                               z_col="#BFDBEE"))
 
         return frames_plots
+
+
+    def draw_car_trajectory(self, car, trajectory, dt = 1.0, frames = False, frames_dt = 1.0, footprints = False, footprints_dt = 1.0):
+
+        x = [trajectory.points[0].x]
+        y = [trajectory.points[0].y]
+        t_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dt <= (point.t - t_prev)):
+                t_prev = point.t
+                x.append(point.x)
+                y.append(point.y)
+
+        x.append(trajectory.points[-1].x)
+        y.append(trajectory.points[-1].y)
+
+        plots = tuple(self.ax.plot(x, y, lw=1, color="#800000"))
+
+        if(frames):
+            plots += self.draw_trajectory_frames(car, trajectory, frames_dt)
+
+        if(footprints):
+            plots += self.draw_trajectory_car_footprints(car, trajectory, footprints_dt)
+
+        return plots
+
+
+    def draw_trajectory_frames(self, car, trajectory, dt, x_col="#DFA3A3", x_len=0.7, y_col="#C5EED2", y_len=0.5, z_col="#BFDBEE", lw=4):
+
+        frames_plots = ()
+
+        frames_plots += tuple(self.draw_frame(trajectory.points[0].x,
+                                              trajectory.points[0].y,
+                                              trajectory.points[0].yaw,
+                                              x_col=x_col,
+                                              y_col=y_col,
+                                              z_col=z_col,
+                                              lw=lw))
+
+        t_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dt <= (point.t - t_prev)):
+                t_prev = point.t
+                frames_plots += tuple(self.draw_frame(point.x,
+                                                      point.y,
+                                                      point.yaw,
+                                                      x_col=x_col,
+                                                      y_col=y_col,
+                                                      z_col=z_col,
+                                                      lw=lw))
+
+        frames_plots += tuple(self.draw_frame(trajectory.points[-1].x,
+                                              trajectory.points[-1].y,
+                                              trajectory.points[-1].yaw,
+                                              x_col=x_col,
+                                              y_col=y_col,
+                                              z_col=z_col,
+                                              lw=lw))
+
+        return frames_plots
+
+
+    def draw_trajectory_car_footprints(self, car, trajectory, dt, color="#FFC6D3"):
+        #F0F8FF
+        footprints_plots = ()
+
+        footprints_plots += tuple(self.draw_car(car, trajectory.points[0].x,
+                                                     trajectory.points[0].y,
+                                                     trajectory.points[0].yaw,
+                                                     trajectory.points[0].steering,
+                                                     color=color, lw=1))
+
+        t_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dt <= (point.t - t_prev)):
+                t_prev = point.t
+                footprints_plots += tuple(self.draw_car(car, point.x,
+                                                             point.y,
+                                                             point.yaw,
+                                                             point.steering,
+                                                             color=color, lw=1))
+
+        footprints_plots += tuple(self.draw_car(car, trajectory.points[-1].x,
+                                                     trajectory.points[-1].y,
+                                                     trajectory.points[-1].yaw,
+                                                     trajectory.points[-1].steering,
+                                                     color=color, lw=1))
+
+        return footprints_plots
+
+
+    def draw_car_trajectory_by_len(self, car, trajectory, dl = 1.0, frames = False, frames_dl = 1.0, footprints = False, footprints_dl = 1.0):
+
+        x = [trajectory.points[0].x]
+        y = [trajectory.points[0].y]
+        l_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dl <= (point.l - l_prev)):
+                l_prev = point.l
+                x.append(point.x)
+                y.append(point.y)
+
+        x.append(trajectory.points[-1].x)
+        y.append(trajectory.points[-1].y)
+
+        plots = tuple(self.ax.plot(x, y, lw=1, color="#800000"))
+
+        if(frames):
+            plots += self.draw_trajectory_frames_by_len(car, trajectory, frames_dl)
+
+        if(footprints):
+            plots += self.draw_trajectory_car_footprints_by_len(car, trajectory, footprints_dl)
+
+        return plots
+
+
+    def draw_trajectory_frames_by_len(self, car, trajectory, dl, x_col="#DFA3A3", x_len=0.7, y_col="#C5EED2", y_len=0.5, z_col="#BFDBEE", lw=4):
+
+        frames_plots = ()
+
+        frames_plots += tuple(self.draw_frame(trajectory.points[0].x,
+                                              trajectory.points[0].y,
+                                              trajectory.points[0].yaw,
+                                              x_col=x_col,
+                                              y_col=y_col,
+                                              z_col=z_col,
+                                              lw=lw))
+
+        l_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dl <= (point.l - l_prev)):
+                l_prev = point.l
+                frames_plots += tuple(self.draw_frame(point.x,
+                                                      point.y,
+                                                      point.yaw,
+                                                      x_col=x_col,
+                                                      y_col=y_col,
+                                                      z_col=z_col,
+                                                      lw=lw))
+
+        frames_plots += tuple(self.draw_frame(trajectory.points[-1].x,
+                                              trajectory.points[-1].y,
+                                              trajectory.points[-1].yaw,
+                                              x_col=x_col,
+                                              y_col=y_col,
+                                              z_col=z_col,
+                                              lw=lw))
+
+        return frames_plots
+
+
+    def draw_trajectory_car_footprints_by_len(self, car, trajectory, dl, color="#FFC6D3"):
+        #F0F8FF
+        footprints_plots = ()
+
+        footprints_plots += tuple(self.draw_car(car, trajectory.points[0].x,
+                                                     trajectory.points[0].y,
+                                                     trajectory.points[0].yaw,
+                                                     trajectory.points[0].steering,
+                                                     color=color, lw=1))
+
+        l_prev = 0.0
+        for point in trajectory.points[1:-1]:
+            if (dl <= (point.l - l_prev)):
+                l_prev = point.l
+                footprints_plots += tuple(self.draw_car(car, point.x,
+                                                             point.y,
+                                                             point.yaw,
+                                                             point.steering,
+                                                             color=color, lw=1))
+
+        footprints_plots += tuple(self.draw_car(car, trajectory.points[-1].x,
+                                                     trajectory.points[-1].y,
+                                                     trajectory.points[-1].yaw,
+                                                     trajectory.points[-1].steering,
+                                                     color=color, lw=1))
+
+        return footprints_plots
 
 
     def draw_frame(self, x=0.0, y=0.0, yaw=0.0, x_col="#C00000", x_len=0.7, y_col="#008000", y_len=0.5, z_col="#4682B4", lw=4):
@@ -429,6 +612,19 @@ class CarTrajectoryGenerator():
             self.time   = 0.0
             self.points = []
             self.points_num = 0
+            self.closest_point_id = 0
+
+        def transform_to(self, x, y, yaw):
+
+            R = np.array([[np.cos(yaw), -np.sin(yaw)],
+                          [np.sin(yaw),  np.cos(yaw)]])
+
+            for point in self.points:
+
+                rotated_pose = R.dot(np.array([point.x, point.y]).T).T
+                point.x = rotated_pose[0] + x
+                point.y = rotated_pose[1] + y
+                point.yaw = point.yaw + yaw
 
 
     class ClothoidGenerator():
@@ -595,21 +791,23 @@ class CarTrajectoryGenerator():
 
         def calc_x_y_yaw_by_length(self, gamma, alpha, length, full_length, type, step):
             if (type == "in"):
-                x, y, yaw = self.xCoordByS(gamma, alpha, length, step), \
-                            self.yCoordByS(gamma, alpha, length, step), \
-                            self.tCoordByS(gamma, alpha, length)
+                x, y, yaw,curv = self.xCoordByS(gamma, alpha, length, step), \
+                                 self.yCoordByS(gamma, alpha, length, step), \
+                                 self.tCoordByS(gamma, alpha, length), \
+                                 alpha * length
             else:
 
                 origin_x, origin_y, origin_yaw = self.xCoordByS(-gamma, alpha, full_length, step), \
                                                  self.yCoordByS(-gamma, alpha, full_length, step), \
                                                  self.tCoordByS( gamma, alpha, full_length)
 
-                x, y, yaw = self.xCoordByS(-gamma, alpha, full_length - length, step), \
-                            self.yCoordByS(-gamma, alpha, full_length - length, step), \
-                            self.tCoordByS( gamma, alpha, full_length - length)
+                x, y, yaw, curv = self.xCoordByS(-gamma, alpha, full_length - length, step), \
+                                  self.yCoordByS(-gamma, alpha, full_length - length, step), \
+                                  self.tCoordByS( gamma, alpha, full_length - length), \
+                                  - alpha * (full_length - length)
                 x, y, yaw = self.itransform(x, y, yaw, origin_x, origin_y, origin_yaw)
 
-            return x, y, yaw
+            return x, y, yaw, curv
 
 
         def calc_x_y_yaw_by_curv_on_length(self, max_clothoid_angle, min_turn_radius, length, type, step):
@@ -621,8 +819,8 @@ class CarTrajectoryGenerator():
             if type == "out":
                 sharpness *= -1
 
-
-            return self.calc_x_y_yaw_by_length(gamma, sharpness, length, clothoid_length, type, step)
+            x, y, yaw, curvature = self.calc_x_y_yaw_by_length(gamma, sharpness, length, clothoid_length, type, step)
+            return x, y, yaw, curvature, sharpness
 
 
     def get_8_traj_sectors_params(self, clothoid_generator, max_clothoid_angle, min_turn_radius, clothoid_length, calc_accuracy):
@@ -648,21 +846,21 @@ class CarTrajectoryGenerator():
                                  'length':    clothoid_length,
                                  'end_pose':  {'x':0.,'y':0.,'yaw':0.}}}
 
-        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[0]['angle'],
-                                                                      trajectory_sectors[0]['radius'],
-                                                                      trajectory_sectors[0]['length'],
-                                                                      trajectory_sectors[0]['type'],
-                                                                      calc_accuracy)
+        x, y, yaw, c, sh = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[0]['angle'],
+                                                                             trajectory_sectors[0]['radius'],
+                                                                             trajectory_sectors[0]['length'],
+                                                                             trajectory_sectors[0]['type'],
+                                                                             calc_accuracy)
 
         trajectory_sectors[0]['end_pose']['x'] = x
         trajectory_sectors[0]['end_pose']['y'] = y
         trajectory_sectors[0]['end_pose']['yaw'] = yaw
 
-        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[1]['angle'],
-                                                                      trajectory_sectors[1]['radius'],
-                                                                      trajectory_sectors[1]['length'],
-                                                                      trajectory_sectors[1]['type'],
-                                                                      calc_accuracy)
+        x, y, yaw, c, sh = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[1]['angle'],
+                                                                             trajectory_sectors[1]['radius'],
+                                                                             trajectory_sectors[1]['length'],
+                                                                             trajectory_sectors[1]['type'],
+                                                                             calc_accuracy)
 
         x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[0]['end_pose']['x'],
                                                             trajectory_sectors[0]['end_pose']['y'],
@@ -672,11 +870,11 @@ class CarTrajectoryGenerator():
         trajectory_sectors[1]['end_pose']['y'] = y
         trajectory_sectors[1]['end_pose']['yaw'] = yaw
 
-        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[2]['angle'],
-                                                                      trajectory_sectors[2]['radius'],
-                                                                      trajectory_sectors[2]['length'],
-                                                                      trajectory_sectors[2]['type'],
-                                                                      calc_accuracy)
+        x, y, yaw, c, sh = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[2]['angle'],
+                                                                             trajectory_sectors[2]['radius'],
+                                                                             trajectory_sectors[2]['length'],
+                                                                             trajectory_sectors[2]['type'],
+                                                                             calc_accuracy)
 
         x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[1]['end_pose']['x'],
                                                             trajectory_sectors[1]['end_pose']['y'],
@@ -686,11 +884,11 @@ class CarTrajectoryGenerator():
         trajectory_sectors[2]['end_pose']['y'] = y
         trajectory_sectors[2]['end_pose']['yaw'] = yaw
 
-        x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[3]['angle'],
-                                                                      trajectory_sectors[3]['radius'],
-                                                                      trajectory_sectors[3]['length'],
-                                                                      trajectory_sectors[3]['type'],
-                                                                      calc_accuracy)
+        x, y, yaw, c, sh = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[3]['angle'],
+                                                                             trajectory_sectors[3]['radius'],
+                                                                             trajectory_sectors[3]['length'],
+                                                                             trajectory_sectors[3]['type'],
+                                                                             calc_accuracy)
 
         x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[2]['end_pose']['x'],
                                                             trajectory_sectors[2]['end_pose']['y'],
@@ -703,7 +901,7 @@ class CarTrajectoryGenerator():
         return trajectory_sectors
 
 
-    def generate_8_traj_using_4_clothoids(self, min_turn_radius, max_vel = 1.0, acc=1.0, dec=1.5, frequency=100.0):
+    def generate_8_traj_using_4_clothoids(self, car, min_turn_radius, max_vel = 1.0, acc=1.0, dec=1.5, frequency=100.0):
 
         period = 1.0 / frequency
         max_clothoid_angle = 2.27884
@@ -781,47 +979,66 @@ class CarTrajectoryGenerator():
 
         for point in trajectory.points:
             sector = int(point.l / clothoid_length)
-            print(str(point.l)+"\t"+str(trajectory.length)+"\t"+str(sector))
-            x, y, yaw = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[sector]['angle'],
-                                                                          trajectory_sectors[sector]['radius'],
-                                                                          point.l - sector * clothoid_length,
-                                                                          trajectory_sectors[sector]['type'],
-                                                                          calc_accuracy)
+            x, y, yaw, curv, sh = clothoid_generator.calc_x_y_yaw_by_curv_on_length(trajectory_sectors[sector]['angle'],
+                                                                                    trajectory_sectors[sector]['radius'],
+                                                                                    point.l - sector * clothoid_length,
+                                                                                    trajectory_sectors[sector]['type'],
+                                                                                    calc_accuracy)
 
             if (sector > 0):
                 x, y, yaw = clothoid_generator.transform(x, y, yaw, trajectory_sectors[sector-1]['end_pose']['x'],
                                                                     trajectory_sectors[sector-1]['end_pose']['y'],
                                                                     trajectory_sectors[sector-1]['end_pose']['yaw'])
 
-            point.x, point.y, point.yaw = x, y, yaw
+            turn_radius = 10000.0
+            if (abs(curv) > 0.0001):
+                turn_radius = 1. / curv
+
+            steering = car.calc_steering_by_turn_radius(turn_radius)
+
+            # print(str(sector)+"\t"+str(round(point.l,2))+"\t"+str(round(sh,3))+"\t"+ \
+            #                     str(round(curv,3))+"\t"+str(round(turn_radius,1))+"\t"+ \
+            #                     str(round(steering,2)))
+
+            point.x = x
+            point.y = y
+            point.yaw = yaw
+            point.steering = steering
+            point.curvature = curv
+            point.sharpness = sh
 
         return trajectory
 
 
-def update_plot(frame, car, plotter, traj_plot=None):
+def update_plot(frame, car, plotter, trajectory, animation_dt, traj_plot=None):
+
+    # print(datetime.now().time())
 
     info_data = ""
 
-    if (frame < len(car.history_x)):
-        car.x = car.history_x[frame]
-        car.y = car.history_y[frame]
-        car.yaw = car.history_yaw[frame]
-        car.set_steering(car.history_steer[frame])
-        # plotter.title.set_text("Time[s]:" + str(round(car.history_t[frame], 2))+
-        #           # ", accel[m/s]:" + str(round(accel, 2)) +
+    time = frame * animation_dt
+    cur_point_id = None
+    for i in range(trajectory.closest_point_id, trajectory.points_num):
+        if (trajectory.points[i].t >= time):
+            cur_point_id = i
+            break
 
-        info_data = "Time[s]:" + str(round(car.history_t[frame], 2)) + \
-                    "\nSpeed[km/h]:" + str(round(car.history_v[frame] * 3.6, 2))
+    if (cur_point_id):
+        car.x = trajectory.points[cur_point_id].x
+        car.y = trajectory.points[cur_point_id].y
+        car.yaw = trajectory.points[cur_point_id].yaw
+        car.set_steering(trajectory.points[cur_point_id].steering)
 
-        info = plotter.ax.text(0.75, 0.92, info_data,
-                                bbox={'facecolor':'w', 'alpha':0.5, 'pad':5},
-                                ha="left", transform=plotter.ax.transAxes, ),
-
+        info_data = "Time[s]:" + str(round(trajectory.points[cur_point_id].t, 2)) + \
+                    "\nSpeed[m/s]:" + str(round(trajectory.points[cur_point_id].v, 2))
     else:
-        car.x = car.history_x[-1]
-        car.y = car.history_y[-1]
-        car.yaw = car.history_yaw[-1]
-        car.set_steering(car.history_steer[-1])
+        car.x = trajectory.points[-1].x
+        car.y = trajectory.points[-1].y
+        car.yaw = trajectory.points[-1].yaw
+        car.set_steering(trajectory.points[-1].steering)
+
+        info_data = "Time[s]:" + str(round(trajectory.points[-1].t, 2)) + \
+                    "\nSpeed[m/s]:" + str(round(trajectory.points[-1].v, 2))
 
     plotting_tuple = ()
 
@@ -833,6 +1050,9 @@ def update_plot(frame, car, plotter, traj_plot=None):
     plotting_tuple += plotter.draw_additional_car_geometry(car, car.x, car.y, car.yaw, car.steer)
 
     if (info_data):
+        info = plotter.ax.text(0.75, 0.92, info_data,
+                               bbox={'facecolor':'w', 'alpha':0.5, 'pad':5},
+                               ha="left", transform=plotter.ax.transAxes, ),
         plotting_tuple += info
 
     return plotting_tuple
@@ -843,49 +1063,62 @@ def main():
 
     car = Car()
     # car.generate_8_traj_by_control(dt=0.02)
+    trajectoryGen = CarTrajectoryGenerator()
+    trajectory = trajectoryGen.generate_8_traj_using_4_clothoids(car, min_turn_radius=5, max_vel = 4.0, acc=0.4, dec=0.7, frequency=100.0)
+    # trajectory.transform_to(0, 0, -(2.27884-m.pi/2)+m.pi/2)
+    # trajectory.transform_to(0, 0, -(2.27884-m.pi/2))
 
-    plotter = Plotter([-13,13], [-13,13])
+    print("Total time:\t" + str(trajectory.time))
 
-    # print(str(round(k_cc, 2))  + "\t" + \
-    #       str(round(d_cc, 2))  + "\t" + \
-    #       str(round(gamma, 2)) + "\t" + \
-    #       str(round(alpha, 2)) + "\t" + \
-    #       str(round(s_end, 2)))
+    plotter = Plotter([-16,16], [-22,22])
 
-    # animation_dt = 0.05
-    # animation_period = 1000./(1./animation_dt)
-    # traj_plot = plotter.draw_traj_from_history(car, dt=animation_dt, frames=True,
-    #                                                                  frames_dt=0.4,
-    #                                                                  footprints=True,
-    #                                                                  footprints_dt=0.4)
+    # traj_plot = plotter.draw_car_trajectory_by_len(car, trajectory, dl = 0.3, frames = True,
+    #                                                                           frames_dl = 5.4,
+    #                                                                           footprints = True,
+    #                                                                           footprints_dl = 5.4)
+    animation_dt = 0.04
+    animation_period = int(1000*animation_dt)
 
+    # # traj_plot = None
     # animation = FuncAnimation(plotter.fig,
     #                           update_plot,
-    #                           fargs=(car, plotter, traj_plot),
-    #                           interval=40,          # if too large and blit is True
-    #                           blit=True)            # throw an exeption but works somehow
+    #                           fargs=(car, plotter, trajectory, animation_dt, traj_plot),
+    #                           interval=70,#animation_period,          # if too large and blit is True
+    #                           blit=True)                          # throw an exeption but works somehow
 
-    trajectoryGen = CarTrajectoryGenerator()
-    trajectory = trajectoryGen.generate_8_traj_using_4_clothoids(min_turn_radius=2, max_vel = 2.0, acc=0.2, dec=0.4, frequency=10.0)
+
     t=[]
     l=[]
     v=[]
     a=[]
-    x=[]
-    y=[]
+    s=[]
+    yaw=[]
     for point in trajectory.points:
-        x.append(point.x)
-        y.append(point.y)
+        s.append(point.steering)
+        yaw.append(point.yaw)
         t.append(point.t)
-        l.append(point.l)
+        l.append(point.l*0.2)
         v.append(point.v)
         a.append(point.a)
 
-    plotter.ax.plot(x, y, lw=3, color="#A000A0")
-    plotter.ax.plot(t, l, lw=3, color="#A00000")
-    plotter.ax.plot(t, v, lw=3, color="#00B000")
-    plotter.ax.plot(t, a, lw=3, color="#000090")
+    # plotter.ax.plot(x, y, lw=3, color="#A000A0")
+    # plotter.ax.set_xlabel("angle, [rad]")
+    # plotter.ax.set_ylabel("coords, [m]")
+    # plotter.ax.plot(s, l, lw=3, color="#A00040",   label='steering')
+    # plotter.ax.plot(yaw, l, lw=3, color="#606000", label='yaw')
 
+    plotter.ax.set_xlabel("time, [s]")
+    plotter.ax.set_ylabel("angle, [rad]")
+    plotter.ax.plot(t, s, lw=3, color="#A00040",   label='steering')
+    plotter.ax.plot(t, yaw, lw=3, color="#606000", label='yaw')
+
+    # plotter.ax.set_xlabel("time, [s]")
+    # plotter.ax.set_ylabel("coords, [m]")
+    # plotter.ax.plot(t, l, lw=3, color="#A00000", label='path * 0.2')
+    # plotter.ax.plot(t, v, lw=3, color="#00B000", label='velocity')
+    # plotter.ax.plot(t, a, lw=3, color="#000090", label='acceleration')
+
+    # plotter.ax.legend()
     plt.show()
 
 
